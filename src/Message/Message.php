@@ -35,11 +35,7 @@ class Message
             ...$this->getMessageArray(),
             SaltoClient::ETX,
         ];
-        $lrc = 0x00;
-        foreach ($bytearray as $char) {
-            $lrc ^= ord($char);
-        }
-        return $lrc;
+        return SaltoClient::computeLrc($bytearray);
     }
 
     public function getFields() : array {

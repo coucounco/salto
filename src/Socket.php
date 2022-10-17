@@ -2,6 +2,8 @@
 
 namespace rohsyl\Salto;
 
+use rohsyl\Salto\Message\Message;
+
 class Socket
 {
     private $endpoint;
