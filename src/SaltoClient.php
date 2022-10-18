@@ -15,6 +15,8 @@ class SaltoClient
 
     const SEPARATOR = 0xB3; // Field separator
 
+    const DATE_FORMAT = 'hh mm DDMMYY';
+
     private $endpoint;
     private $port;
     private $lrc_skip = false;
@@ -51,6 +53,10 @@ class SaltoClient
 
         $responseAcknowledgement = $this->readResponse();
 
+        if($this->isEnq($frame)) {
+            return $responseAcknowledgement;
+        }
+
         if($responseAcknowledgement->isAck()) {
             // server got the request and will process it
             $requestResponse = $this->readResponse();
@@ -61,6 +67,10 @@ class SaltoClient
             // server can't process the request
             // throw error
         }
+    }
+
+    public function isEnq($frame) {
+        return $frame === self::ENQ;
     }
 
     public function readResponse() {
