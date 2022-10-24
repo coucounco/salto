@@ -3,6 +3,7 @@
 namespace rohsyl\Salto;
 
 use rohsyl\Salto\Message\Message;
+use rohsyl\Salto\Response\Response;
 
 class SaltoClient
 {
@@ -44,10 +45,15 @@ class SaltoClient
     }
 
     public function isReady() {
-        return $this->sendRequest(self::ENQ) === self::ACK;
+        echo 'send enq';
+        return $this->sendRequest([self::ENQ, "\n"])->isAck();
     }
 
-    public function sendRequest($frame) {
+    public function sendRequest(string|array $frame) : Response {
+
+        if(is_array($frame)) {
+            $frame = join($frame);
+        }
 
         $this->socket->write($frame);
 
@@ -56,6 +62,8 @@ class SaltoClient
         if($this->isEnq($frame)) {
             return $responseAcknowledgement;
         }
+
+        if($frame === self::ENQ) return $responseAcknowledgement;
 
         if($responseAcknowledgement->isAck()) {
             // server got the request and will process it
@@ -84,16 +92,19 @@ class SaltoClient
         $isChecksum = false;
         $checksum = null;
         do {
-            $byte = $this->socket->readByte();
+            $string = $this->socket->readByte();
+            $byte = intval($string);
 
 
             if($byte === SaltoClient::ACK) {
+                echo 'ack';
                 // request will be processed
-                // return Response::Ack();
+                return Response::Ack();
             }
             if($byte === SaltoClient::NAK) {
+                echo 'nak';
                 // request wont be processed
-                // return Response::Nak();
+                return Response::Nak();
             }
 
             // are we already processing a frame ?

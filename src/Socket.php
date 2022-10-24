@@ -19,12 +19,11 @@ class Socket
 
     public function open() {
         $this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-        if(!is_resource($this->socket)) onSocketFailure("Failed to create socket");
 
         $result = socket_connect($this->socket, $this->endpoint, $this->port);
 
-        if($result) {
-            onSocketFailure("Failed to connect to '.$this->endpoint.':'.$this->port.'", $this->socket);
+        if(!$result) {
+            print_r("Failed to connect to '.$this->endpoint.':'.$this->port.'") and die();
         }
     }
 
@@ -33,7 +32,7 @@ class Socket
     }
 
     public function readByte() {
-        return socket_read($this->socket, 1);
+        return socket_read($this->socket, 1, PHP_BINARY_READ);
     }
 
     public function close() {

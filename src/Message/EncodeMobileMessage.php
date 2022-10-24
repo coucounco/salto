@@ -3,6 +3,7 @@
 namespace rohsyl\Salto\Message;
 
 use rohsyl\Salto\SaltoClient;
+use Carbon\Carbon;
 
 class EncodeMobileMessage extends Message
 {

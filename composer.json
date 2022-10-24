@@ -16,8 +16,9 @@
         }
     ],
     "require": {
-        "php": ">=7.4",
-        "ext-sockets": "*"
+        "php": ">=8.0",
+        "ext-sockets": "*",
+        "nesbot/carbon": "^2.62"
     },
     "require-dev": {
         "symfony/var-dumper": "^4.3",
@@ -47,7 +48,7 @@
                 "rohsyl\\Salto\\SaltoServiceProvider"
             ],
             "aliases": {
-                "Skeleton": "rohsyl\\Salto\\Salto"
+                "Salto": "rohsyl\\Salto\\Salto"
             }
         }
     }

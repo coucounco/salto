@@ -95,4 +95,12 @@ class Message
 
         return [SaltoClient::STX, ...$this->getMessageArray(), SaltoClient::ETX, $lrc];
     }
+
+    public function toString() {
+        $out = 'STX|';
+        foreach($this->trimEmptyFields($this->getFields()) as $field) {
+            $out .= $field . '|';
+        }
+        return $out . 'ETX ' . $this->getLrcChecksum();
+    }
 }

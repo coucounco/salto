@@ -3,6 +3,8 @@
 namespace rohsyl\Salto;
 
 use Illuminate\Support\ServiceProvider;
+use rohsyl\Salto\Commands\SaltoClientCommand;
+use rohsyl\Salto\Commands\SaltoServerCommand;
 
 class SaltoServiceProvider extends ServiceProvider
 {
@@ -20,6 +22,13 @@ class SaltoServiceProvider extends ServiceProvider
      */
     public function register()
     {
+
+        if(!$this->app->isProduction() && $this->app->runningInConsole()) {
+            $this->commands([
+                SaltoServerCommand::class,
+                SaltoClientCommand::class
+            ]);
+        }
 
     }
 }
