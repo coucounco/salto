@@ -2,7 +2,8 @@
 
 namespace rohsyl\Salto;
 
-use rohsyl\Salto\Message\Message;
+use rohsyl\Salto\Exceptions\ConnectionFailedException;
+use rohsyl\Salto\Messages\Message;
 
 class Socket
 {
@@ -23,7 +24,7 @@ class Socket
         $result = socket_connect($this->socket, $this->endpoint, $this->port);
 
         if(!$result) {
-            print_r("Failed to connect to '.$this->endpoint.':'.$this->port.'") and die();
+            throw new ConnectionFailedException($this->endpoint, $this->port);
         }
     }
 
@@ -37,5 +38,9 @@ class Socket
 
     public function close() {
         socket_close($this->socket);
+    }
+
+    public static function forClient(SaltoClient $client) {
+        return new self($client->getEndpoint(), $client->getPort());
     }
 }

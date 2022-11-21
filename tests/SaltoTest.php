@@ -3,7 +3,7 @@
 namespace Spatie\Skeleton\Tests;
 
 use PHPUnit\Framework\TestCase;
-use rohsyl\Salto\Message\EncodeMobileMessage;
+use rohsyl\Salto\Messages\EncodeMobileMessage;
 use rohsyl\Salto\SaltoClient;
 use Carbon\Carbon;
 

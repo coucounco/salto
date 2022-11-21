@@ -3,7 +3,7 @@
 namespace rohsyl\Salto\Commands;
 
 use Illuminate\Console\Command;
-use rohsyl\Salto\Message\EncodeMobileMessage;
+use rohsyl\Salto\Messages\EncodeMobileMessage;
 use rohsyl\Salto\SaltoClient;
 use Carbon\Carbon;
 

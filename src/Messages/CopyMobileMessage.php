@@ -1,6 +1,6 @@
 <?php
 
-namespace rohsyl\Salto\Message;
+namespace rohsyl\Salto\Messages;
 
 class CopyMobileMessage extends EncodeMobileMessage
 {

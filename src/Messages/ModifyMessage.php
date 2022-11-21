@@ -1,6 +1,6 @@
 <?php
 
-namespace rohsyl\Salto\Message;
+namespace rohsyl\Salto\Messages;
 
 use Carbon\Carbon;
 use rohsyl\Salto\SaltoClient;

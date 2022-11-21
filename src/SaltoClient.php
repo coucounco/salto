@@ -2,7 +2,10 @@
 
 namespace rohsyl\Salto;
 
-use rohsyl\Salto\Message\Message;
+use rohsyl\Salto\Exceptions\NakException;
+use rohsyl\Salto\Exceptions\SaltoErrorException;
+use rohsyl\Salto\Exceptions\WrongChecksumException;
+use rohsyl\Salto\Messages\Message;
 use rohsyl\Salto\Response\Response;
 
 /**
@@ -43,7 +46,7 @@ class SaltoClient
     }
 
     public function openSocketConnection() {
-        $this->socket = new Socket($this->endpoint, $this->port);
+        $this->socket = Salto::getSocket($this);
         $this->socket->open();
     }
 
@@ -58,32 +61,18 @@ class SaltoClient
             $frame = join($frame);
         }
 
+        $waitAnswer = !$this->isEnq($frame);
+
         $this->socket->write($frame);
 
-        $responseAcknowledgement = $this->readResponse();
-
-        if($this->isEnq($frame)) {
-            return $responseAcknowledgement;
-        }
-
-        if($frame === self::ENQ) return $responseAcknowledgement;
-
-        if($responseAcknowledgement->isAck()) {
-            // server got the request and will process it
-            $requestResponse = $this->readResponse();
-
-            return $requestResponse;
-        }
-        else if ($responseAcknowledgement->isNak()) {
-            return Response::Nak();
-        }
+        return $this->readResponse($waitAnswer);
     }
 
     public function isEnq($frame) {
         return $frame === self::ENQ;
     }
 
-    public function readResponse() {
+    public function readResponse($waitAnswer = true) {
 
         $isFrame = false;
 
@@ -93,20 +82,25 @@ class SaltoClient
 
         $isChecksum = false;
         $checksum = null;
+        $response = null;
         do {
             $string = $this->socket->readByte();
             $byte = intval($string);
 
 
             if($byte === SaltoClient::ACK) {
-                echo 'ack';
-                // request will be processed
-                return Response::Ack();
+                if(!$waitAnswer) {
+                    return Response::Ack();
+                }
+                // wait for the next byte stx
+                $isFrame = false;
+                continue;
             }
             if($byte === SaltoClient::NAK) {
                 echo 'nak';
                 // request wont be processed
-                return Response::Nak();
+                $response = Response::Nak();
+                break;
             }
 
             // are we already processing a frame ?
@@ -150,25 +144,27 @@ class SaltoClient
             }
             else if (!$isChecksum) {
                 $checksum = $byte;
+
+                $response = new Response($body, $checksum);
                 break;
             }
 
 
         } while (true);
 
-        $response = new Response($body, $checksum);
+
+        if($response->isNak()) {
+            throw new NakException($response);
+        }
 
         if(!$response->check()) {
-            // throw error wrong checksum
+            throw new WrongChecksumException($response);
         }
 
         if($response->isError()) {
-            // throw error
+            throw new SaltoErrorException($response);
         }
 
-        if($response->isNak()) {
-            // throw error command refused by server
-        }
 
         return $response;
     }
@@ -177,9 +173,35 @@ class SaltoClient
 
         $message->skipLrc($this->lrc_skip);
 
-        return $this->sendRequest($message->getFrame());
+        $response = $this->sendRequest($message->getFrame());
+
+        $response->setRequest($message);
+
+        return $response;
     }
 
+
+    /**
+     * @return string
+     */
+    public function getEndpoint(): string
+    {
+        return $this->endpoint;
+    }
+
+    /**
+     * @return int
+     */
+    public function getPort(): int
+    {
+        return $this->port;
+    }
+
+    /**
+     * Compute the LRC checksum for the given array of bytes
+     * @param array $bytearray
+     * @return int
+     */
     public static function computeLrc(array $bytearray) {
         $lrc = 0x00;
         foreach ($bytearray as $char) {
