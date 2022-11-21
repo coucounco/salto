@@ -55,14 +55,14 @@ class SaltoServerCommand extends Command
                 if (!$buf = trim($buf)) {
                     continue;
                 }
-                if ($buf == 0x05) {
-                    socket_write($msgsock, 0x06);
+                if ($buf == 0x05) { // ENQ
+                    socket_write($msgsock, 0x06); // ACK
                 }
-                if($buf[0] == 0x02) {
+                if($buf[0] == 0x02) { // STX
 
                     echo 'STX' . "\n";
 
-                    socket_write($msgsock, 0x06);
+                    socket_write($msgsock, 0x06); // ACK
 
                     socket_write($msgsock, join(0xB3, [
                         0x02, 'CNM', '+41774539943', '101', 0x03

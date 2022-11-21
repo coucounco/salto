@@ -24,6 +24,10 @@ class Response
         $this->checksum = $checksum;
     }
 
+    public function getCommandName() {
+        return $this->rawResponse[1];
+    }
+
     public function isAck() {
         return $this->rawResponse === SaltoClient::ACK;
     }
@@ -36,7 +40,25 @@ class Response
         return $this->rawResponse[0] === SaltoClient::STX;
     }
 
+    public function getRawMessageArray() {
+        return array_slice($this->rawResponse, 1, sizeof($this->rawResponse) - 2);
+    }
+
+    public function isError() {
+        return in_array($this->rawResponse[1], SaltoClient::getErrors());
+    }
+
+    public function getErrorDescription() {
+        return SaltoClient::getErrorDescription($this->rawResponse[0]);
+    }
+
     public function raw() {
         return $this->rawResponse;
+    }
+
+    public function check() {
+        if($this->checksum == SaltoClient::LRC_SKIP) return true;
+
+        return $this->checksum == SaltoClient::computeLrc($this->getRawMessageArray());
     }
 }

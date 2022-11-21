@@ -5,6 +5,9 @@ namespace rohsyl\Salto;
 use rohsyl\Salto\Message\Message;
 use rohsyl\Salto\Response\Response;
 
+/**
+ *
+ */
 class SaltoClient
 {
     const STX = 0x02; // Start of text, indicates the start of a message
@@ -16,7 +19,7 @@ class SaltoClient
 
     const SEPARATOR = 0xB3; // Field separator
 
-    const DATE_FORMAT = 'hh mm DDMMYY';
+    const DATE_FORMAT = 'hhmmDDMMYY';
 
     private $endpoint;
     private $port;
@@ -45,7 +48,7 @@ class SaltoClient
     }
 
     public function isReady() {
-        echo 'send enq';
+        //echo 'send enq';
         return $this->sendRequest([self::ENQ, "\n"])->isAck();
     }
 
@@ -72,8 +75,7 @@ class SaltoClient
             return $requestResponse;
         }
         else if ($responseAcknowledgement->isNak()) {
-            // server can't process the request
-            // throw error
+            return Response::Nak();
         }
     }
 
@@ -154,16 +156,21 @@ class SaltoClient
 
         } while (true);
 
-        $computedChecksum = self::computeLrc([
+        $response = new Response($body, $checksum);
 
-        ]);
+        if(!$response->check()) {
+            // throw error wrong checksum
+        }
 
-        print_r([
-            $body[0], // message name
-            $body, // data
-            $checksum, // checksum
-        ]);
+        if($response->isError()) {
+            // throw error
+        }
 
+        if($response->isNak()) {
+            // throw error command refused by server
+        }
+
+        return $response;
     }
 
     public function sendMessage(Message $message) {
@@ -179,5 +186,28 @@ class SaltoClient
             $lrc ^= ord($char);
         }
         return $lrc;
+    }
+
+    private static $_errors = [
+        'ES' => 'Syntax error. The received message from the PMS is not correct (unknown command, nonsense parameters, prohibited characters, etc.)',
+        'NC' => 'No communication. The specified encoder does not answer (encoder is switched off, disconnected from the PC interface, etc.)',
+        'NF' => 'No files. Database file in the PC interface is damaged, corrupted or not found.',
+        'OV' => 'Overflow. The encoder is still busy executing a previous task and cannot accept a new one.',
+        'EP' => 'Card error. Card not found or wrongly inserted in the encoder.',
+        'EF' => 'Format error. The card has been encoded by another system or may be damaged.',
+        'TD' => 'Unknown room. This error occurs when trying to encode a card for a non-existing room.',
+        'ED' => 'Timeout error. The encoder has been waiting too long for a card to be inserted. The operation is cancelled.',
+        'EA' => 'This error occurs when the PC interface cannot execute the ‘CC’ command (encode copies of a guest card) because the room is checked out.',
+        'OS' => 'This error occurs when the requested room is out of service.',
+        'EO' => 'The requested guest card is being encoded by another station.',
+        'EG' => 'General error. When the resulting error is none of the above described, the PC interface returns an ‘EG’ followed by an encoder number (or phone number depending on the original request) and an error description.',
+    ];
+
+    public static function getErrors() : array {
+        return array_keys(self::$_errors);
+    }
+
+    public static function getErrorDescription($error) {
+        return self::$_errors[$error] ?? null;
     }
 }
