@@ -49,7 +49,7 @@ class Message
 
         $bytearray[] = SaltoClient::SEPARATOR;
         foreach($fields as $field) {
-            $bytearray = array_merge($bytearray, unpack('C*', $field));
+            $bytearray[] = $field;
             $bytearray[] = SaltoClient::SEPARATOR;
         }
 
@@ -101,6 +101,6 @@ class Message
         foreach($this->trimEmptyFields($this->getFields()) as $field) {
             $out .= $field . '|';
         }
-        return $out . 'ETX ' . $this->getLrcChecksum();
+        return $out . 'ETX' . $this->getLrcChecksum();
     }
 }

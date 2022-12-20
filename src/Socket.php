@@ -29,7 +29,7 @@ class Socket
     }
 
     public function write($data) {
-        return socket_write($this->socket, $data);
+        return socket_write($this->socket, $data, strlen($data));
     }
 
     public function readByte() {

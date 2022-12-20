@@ -51,25 +51,71 @@ class SaltoClient
     }
 
     public function isReady() {
-        //echo 'send enq';
-        return $this->sendRequest([self::ENQ, "\n"])->isAck();
+        return $this->sendRequest([self::ENQ])->isAck();
     }
 
-    public function sendRequest(string|array $frame) : Response {
-
-        if(is_array($frame)) {
-            $frame = join($frame);
-        }
+    public function sendRequest(array $frame) : Response {
 
         $waitAnswer = !$this->isEnq($frame);
 
-        $this->socket->write($frame);
+        // convert string array to binary string
+        $frame = $this->stringArrayToBinaryString($frame);
+        echo $frame . "\n";
+
+        echo 'Frame sent : ' . $this->binaryStringToHexaString($frame) . "\n";
+
+        $result = $this->socket->write($frame);
 
         return $this->readResponse($waitAnswer);
     }
 
+    private function stringArrayToBinaryString(array $strings) {
+
+        $binaryString = '';
+
+        foreach ($strings as $string) {
+            if(is_string($string)) {
+                $binaryString .= $this->stringToBinary($string);
+            }
+            else {
+                $binaryString.= pack('C*', $string);
+            }
+        }
+        return $binaryString;
+    }
+
+    private function stringToBinary(string $string) {
+        $binary = '';
+        foreach(str_split($string) as $char) {
+
+            $binary .= pack('C*', ord($char));
+        }
+        return $binary;
+    }
+
+    private function binaryToDecimal($byte) {
+        return intval(join(unpack('C*', $byte)));
+    }
+
+    private function decimalToHexaString($frame) {
+        $string = '';
+        foreach($frame as $dec) {
+            $string .= '0x' . str_pad(dechex($dec), 2, '0', STR_PAD_LEFT) . ' ';
+        }
+        return $string;
+    }
+
+    private function binaryStringToHexaString($frame) {
+        $decArray = unpack('C*', $frame);
+        $string = '';
+        foreach($decArray as $dec) {
+            $string .= '0x' . str_pad(dechex($dec), 2, '0', STR_PAD_LEFT) . ' ';
+        }
+        return $string;
+    }
+
     public function isEnq($frame) {
-        return $frame === self::ENQ;
+        return $frame[0] ?? null === self::ENQ;
     }
 
     public function readResponse($waitAnswer = true) {
@@ -84,11 +130,14 @@ class SaltoClient
         $checksum = null;
         $response = null;
         do {
-            $string = $this->socket->readByte();
-            $byte = intval($string);
+            echo "read...\n";
+            $byte = $this->socket->readByte();
+            $byte = $this->binaryToDecimal($byte);
+            echo "Byte read : " . $this->decimalToHexaString([$byte]) . "\n";
 
 
-            if($byte === SaltoClient::ACK) {
+            if($byte == SaltoClient::ACK) {
+                echo "ack...\n";
                 if(!$waitAnswer) {
                     return Response::Ack();
                 }
@@ -96,8 +145,8 @@ class SaltoClient
                 $isFrame = false;
                 continue;
             }
-            if($byte === SaltoClient::NAK) {
-                echo 'nak';
+            if($byte == SaltoClient::NAK) {
+                echo "nak...\n";
                 // request wont be processed
                 $response = Response::Nak();
                 break;
@@ -148,7 +197,6 @@ class SaltoClient
                 $response = new Response($body, $checksum);
                 break;
             }
-
 
         } while (true);
 
