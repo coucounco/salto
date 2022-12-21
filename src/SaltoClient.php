@@ -7,6 +7,7 @@ use rohsyl\Salto\Exceptions\SaltoErrorException;
 use rohsyl\Salto\Exceptions\WrongChecksumException;
 use rohsyl\Salto\Messages\Message;
 use rohsyl\Salto\Response\Response;
+use rohsyl\Salto\Utils\Convert;
 
 /**
  *
@@ -22,7 +23,7 @@ class SaltoClient
 
     const SEPARATOR = 0xB3; // Field separator
 
-    const DATE_FORMAT = 'hhmmDDMMYY';
+    const DATE_FORMAT = 'Hidmy';
 
     private $endpoint;
     private $port;
@@ -54,109 +55,78 @@ class SaltoClient
         return $this->sendRequest([self::ENQ])->isAck();
     }
 
-    public function sendRequest(array $frame) : Response {
+    public function sendRequest(Message|array $frame) : Response {
+
+        $request = null;
+        if($frame instanceof Message) {
+            $request = $frame;
+            $frame = $frame->getFrame();
+        }
 
         $waitAnswer = !$this->isEnq($frame);
 
+        echo 'wait for answer : ' . ($waitAnswer ? 'yes' : 'no') . "\n";
+
         // convert string array to binary string
-        $frame = $this->stringArrayToBinaryString($frame);
+        $frame = Convert::stringArrayToBinaryString($frame);
         echo $frame . "\n";
 
-        echo 'Frame sent : ' . $this->binaryStringToHexaString($frame) . "\n";
+        echo "Frame sent : \n" . Convert::binaryStringToHexaString($frame) . "\n";
 
-        $result = $this->socket->write($frame);
+        $this->socket->write($frame);
 
-        return $this->readResponse($waitAnswer);
-    }
-
-    private function stringArrayToBinaryString(array $strings) {
-
-        $binaryString = '';
-
-        foreach ($strings as $string) {
-            if(is_string($string)) {
-                $binaryString .= $this->stringToBinary($string);
-            }
-            else {
-                $binaryString.= pack('C*', $string);
-            }
-        }
-        return $binaryString;
-    }
-
-    private function stringToBinary(string $string) {
-        $binary = '';
-        foreach(str_split($string) as $char) {
-
-            $binary .= pack('C*', ord($char));
-        }
-        return $binary;
-    }
-
-    private function binaryToDecimal($byte) {
-        return intval(join(unpack('C*', $byte)));
-    }
-
-    private function decimalToHexaString($frame) {
-        $string = '';
-        foreach($frame as $dec) {
-            $string .= '0x' . str_pad(dechex($dec), 2, '0', STR_PAD_LEFT) . ' ';
-        }
-        return $string;
-    }
-
-    private function binaryStringToHexaString($frame) {
-        $decArray = unpack('C*', $frame);
-        $string = '';
-        foreach($decArray as $dec) {
-            $string .= '0x' . str_pad(dechex($dec), 2, '0', STR_PAD_LEFT) . ' ';
-        }
-        return $string;
+        return $this->readResponse($waitAnswer, $request);
     }
 
     public function isEnq($frame) {
-        return $frame[0] ?? null === self::ENQ;
+        return ($frame[0] ?? null) == self::ENQ;
     }
 
-    public function readResponse($waitAnswer = true) {
+    public function readResponse($waitAnswer = true, $request = null) {
 
         $isFrame = false;
 
         $isBody = false;
         $body = null;
         $bodyFieldIndex = null;
+        $rawResponse = null;
 
         $isChecksum = false;
-        $checksum = null;
-        $response = null;
+        echo "reading...\n";
         do {
-            echo "read...\n";
             $byte = $this->socket->readByte();
-            $byte = $this->binaryToDecimal($byte);
-            echo "Byte read : " . $this->decimalToHexaString([$byte]) . "\n";
+            $byte = Convert::binaryToDecimal($byte);
+            //echo "Byte read : " . self::decimalToHexaString([$byte]) . "\n";
 
-
-            if($byte == SaltoClient::ACK) {
-                echo "ack...\n";
-                if(!$waitAnswer) {
-                    return Response::Ack();
-                }
-                // wait for the next byte stx
-                $isFrame = false;
-                continue;
-            }
-            if($byte == SaltoClient::NAK) {
-                echo "nak...\n";
-                // request wont be processed
-                $response = Response::Nak();
-                break;
+            if(isset($rawResponse)) {
+                $rawResponse[] = $byte;
             }
 
             // are we already processing a frame ?
             if(!$isFrame) {
+
+                if($byte == SaltoClient::ACK) {
+                    echo "ack.\n";
+                    if(!$waitAnswer) {
+                        return Response::Ack();
+                    }
+                    // wait for the next byte stx
+                    $isFrame = false;
+                    continue;
+                }
+                if($byte == SaltoClient::NAK) {
+                    echo "nak.\n";
+                    // request wont be processed
+                    $response = Response::Nak();
+                    break;
+                }
+
                 // wait until we get a stx that means it's the start of a frame
                 if ($byte === SaltoClient::STX) {
+                    echo "stx.\n";
                     $isFrame = true;
+                    $rawResponse = [];
+                    $rawResponse[] = $byte;
                 }
             }
             // are we already processing the body of the frame ?
@@ -193,13 +163,17 @@ class SaltoClient
             }
             else if (!$isChecksum) {
                 $checksum = $byte;
+                $response = new Response($rawResponse, $body, $checksum);
+                if(isset($request)) {
+                    $response->setRequest($request);
+                }
 
-                $response = new Response($body, $checksum);
                 break;
             }
 
         } while (true);
 
+        echo "Response read : " . $response->getCommandName() . "\n";
 
         if($response->isNak()) {
             throw new NakException($response);
@@ -213,7 +187,6 @@ class SaltoClient
             throw new SaltoErrorException($response);
         }
 
-
         return $response;
     }
 
@@ -221,9 +194,7 @@ class SaltoClient
 
         $message->skipLrc($this->lrc_skip);
 
-        $response = $this->sendRequest($message->getFrame());
-
-        $response->setRequest($message);
+        $response = $this->sendRequest($message);
 
         return $response;
     }
@@ -250,9 +221,10 @@ class SaltoClient
      * @param array $bytearray
      * @return int
      */
-    public static function computeLrc(array $bytearray) {
+    public static function computeLrc(array $stringArray) {
+        $frame = Convert::stringArrayToBinaryString($stringArray);
         $lrc = 0x00;
-        foreach ($bytearray as $char) {
+        foreach (str_split($frame) as $char) {
             $lrc ^= ord($char);
         }
         return $lrc;

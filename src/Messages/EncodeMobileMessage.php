@@ -3,6 +3,7 @@
 namespace rohsyl\Salto\Messages;
 
 use rohsyl\Salto\SaltoClient;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 /**
@@ -41,8 +42,8 @@ class EncodeMobileMessage extends Message
      * Exemple 2 :
      * ```
      *  $message->for([
-     *      'Room101' =>  true,
-     *      'Parking => false,
+     *      'Room101',
+     *      'Parking',
      *  ]);
      * ```
      *
@@ -55,26 +56,40 @@ class EncodeMobileMessage extends Message
         if(is_string($rooms)) {
             $this->putField(2, $rooms);
         }
-        // if array -> key = room and value is boolean that allow or deny access
+        // if array -> allow access to many rooms
         else if(is_array($rooms)) {
-            $grantAccess = [];
-            $denyAccess = [];
             $i = 0;
-            foreach($rooms as $room => $hasAccess) {
-
+            foreach($rooms as $room) {
                 $this->putField(2 + $i, $room);
-                $hasAccess
-                    ? $grantAccess[] = $i + 1
-                    : $denyAccess[] = $i + 1;
-
                 $i++;
             }
 
-            $this->putField(7, join('', $grantAccess));
-            $this->putField(8, join('', $denyAccess));
         }
 
         return $this;
+    }
+
+    /**
+     * With autho
+     * @param array $authorizations
+     * @return $this
+     */
+    public function withAuthorizations(array $authorizations) {
+        $grantAccess = [];
+        $denyAccess = [];
+        foreach($authorizations as $authSymbol => $granted) {
+            $granted
+                ? $grantAccess[] = $authSymbol
+                : $denyAccess[] = $authSymbol;
+        }
+        $this->putField(6, (isset($grantAccess) && !empty($grantAccess) ? join('', $grantAccess) : null));
+        $this->putField(7, (isset($denyAccess) && !empty($denyAccess) ? join('', $denyAccess) : null));
+
+        return $this;
+    }
+
+    public function forRoom(string $room) {
+        return $this->for($room);
     }
 
     /**
@@ -103,7 +118,7 @@ class EncodeMobileMessage extends Message
      * @return $this
      */
     public function by(string $author) {
-        $this->putField(10, $author);
+        $this->putField(10, Str::limit($author, 24, ''));
         return $this;
     }
 
@@ -113,12 +128,12 @@ class EncodeMobileMessage extends Message
      * @return $this
      */
     public function withMessage(string $message) {
-        $this->putField(14, $message);
+        $this->putField(14, Str::limit($message, 256, ''));
         return $this;
     }
 
     public function authCode($code) {
-        $this->putField(15, $code);
+        $this->putField(15, Str::limit($code, 64, ''));
         return $this;
     }
 }

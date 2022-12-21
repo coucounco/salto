@@ -4,6 +4,7 @@ namespace rohsyl\Salto\Response;
 
 use rohsyl\Salto\Messages\Message;
 use rohsyl\Salto\SaltoClient;
+use rohsyl\Salto\Utils\Convert;
 
 /**
  *
@@ -15,7 +16,7 @@ class Response
      * @return Response
      */
     public static function Ack() {
-        return new self(SaltoClient::ACK);
+        return new self([SaltoClient::ACK], [SaltoClient::ACK], null);
     }
 
     /**
@@ -23,7 +24,7 @@ class Response
      * @return Response
      */
     public static function Nak() {
-        return new self(SaltoClient::NAK);
+        return new self([SaltoClient::NAK], [SaltoClient::NAK], null);
     }
 
     protected $request;
@@ -33,14 +34,17 @@ class Response
      */
     protected $rawResponse;
 
+    protected $body;
+
     /**
      * @var string|null The checksum of the response
      */
     protected $checksum;
 
-    public function __construct($rawResponse, $checksum = null)
+    public function __construct($rawResponse, $body, $checksum = null)
     {
         $this->rawResponse = $rawResponse;
+        $this->body = $body;
         $this->checksum = $checksum;
     }
 
@@ -49,7 +53,7 @@ class Response
      * @return mixed
      */
     public function getCommandName() {
-        return $this->rawResponse[1];
+        return Convert::decimalArrayToString($this->body[0]);
     }
 
     /**
@@ -57,7 +61,7 @@ class Response
      * @return bool
      */
     public function isAck() {
-        return $this->rawResponse === SaltoClient::ACK;
+        return $this->rawResponse[0] === SaltoClient::ACK;
     }
 
     /**
@@ -65,7 +69,7 @@ class Response
      * @return bool
      */
     public function isNak() {
-        return $this->rawResponse === SaltoClient::NAK;
+        return $this->rawResponse[0] === SaltoClient::NAK;
     }
 
     /**
@@ -81,7 +85,16 @@ class Response
      * @return array
      */
     public function getRawMessageArray() {
+        // get response but without stx and checksum
         return array_slice($this->rawResponse, 1, sizeof($this->rawResponse) - 2);
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getBody()
+    {
+        return $this->body;
     }
 
     /**
@@ -89,7 +102,7 @@ class Response
      * @return bool
      */
     public function isError() {
-        return in_array($this->rawResponse[1], SaltoClient::getErrors());
+        return in_array($this->getCommandName(), SaltoClient::getErrors());
     }
 
     /**
@@ -97,7 +110,7 @@ class Response
      * @return string|null
      */
     public function getErrorDescription() {
-        return SaltoClient::getErrorDescription($this->rawResponse[0]);
+        return SaltoClient::getErrorDescription($this->getCommandName());
     }
 
     /**
@@ -126,5 +139,13 @@ class Response
     public function getRequest() : Message
     {
         return $this->request;
+    }
+
+    public function toString() {
+        $out = 'STX|';
+        foreach($this->getBody() as $field) {
+            $out .= Convert::decimalArrayToString($field) . '|';
+        }
+        return $out . 'ETX' . $this->checksum;
     }
 }
