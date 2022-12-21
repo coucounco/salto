@@ -22,7 +22,7 @@ class SaltoClientCommand extends Command
         $client = new SaltoClient('5.tcp.eu.ngrok.io', 14072);
         $client->openSocketConnection();
 
-        //if(!$client->isReady()) return;
+        if(!$client->isReady()) return;
 
         echo "ready\n";
 
