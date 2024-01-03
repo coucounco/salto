@@ -1,5 +1,5 @@
 {
-    "name": "rohsyl/salto",
+    "name": "coucounco/salto",
     "description": "A PHP Salto client implementing the PMS Industry Standard protocol via TCP/IP.",
     "keywords": [
         "salto",
